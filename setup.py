@@ -11,7 +11,11 @@ setup(
     license="OGL-UK-3.0",
     install_requires=[
         'robotframework==3.2.2',
-        'docker==4.3.1'
+        'docker==4.3.1',
+        'Faker==4.1.2',
+        'SQLAlchemy==1.3.19',
+        'psycopg2==2.8.5',
+        'alembic==1.4.2'
     ],
     classifiers=[
         "Programming Language :: Python :: 3",

@@ -1,0 +1,18 @@
+name: "Scheduled registry cleanup"
+
+on:
+  schedule:
+    - cron: '0 8 * * 1-5'
+
+jobs:
+  remove-package-versions:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Remove old package versions
+      id: remove-package-versions
+      uses: navikt/remove-package-versions@master
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        remove-semver: false
+        keep-versions: 5

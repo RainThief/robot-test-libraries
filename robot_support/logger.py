@@ -12,6 +12,10 @@ from functools import wraps
 from robot.api import logger as robot_logger
 
 
+class LogError(Exception):
+    """Errors that cannot be logged due to failed logger"""
+
+
 def _console_debug(func: Callable[[str, List[int]], None]) -> Callable[[str, List[int]], None]:
     """Decorator to print logs to console if in debug mode
 
@@ -22,19 +26,22 @@ def _console_debug(func: Callable[[str, List[int]], None]) -> Callable[[str, Lis
         decorated function
     """
     @wraps(func)
-    def decorator(self, message, *args):
+    def decorator(logger, message, *args):
         level = str(func.__name__).upper()
-        if level == "DEBUG" and len(args) > 0:
-            func(self, message, *args)
-        else:
-            func(self, message)
-        if self.level == logging.DEBUG:
 
+        # in debug mode all events output in console
+        if logger.level == logging.DEBUG:
             stream =  sys.stdout
-
             if level == "ERROR":
                 stream =  sys.stderr
-            self.console(f"{level}: {message}", stream)
+            logger.console(f"{level}: {message}", stream)
+
+        if len(args) > 0:
+            func(logger, message, *args)
+            return
+
+        func(logger, message)
+
     return decorator
 
 
@@ -46,50 +53,76 @@ class Logger:
     to a more verbose log and robot reports
 
     Attributes:
-        _INSTANCE: Logger instance
+        __INSTANCE: Logger instance
+        _CREATE_KEY: Unique object reference
 
     Args:
+        create_key: object reference to be checked to prevent
+                    object being instantiated more than once
         log_path: location for log file
         level: logging level to dictate events levels to capture
     """
 
 
-    _INSTANCE = None
+    __INSTANCE = None
+
+    __CREATE_KEY = object()
 
 
     @classmethod
-    def get_instance(cls, path: str = None, level: int = logging.INFO) -> object:
+    def get_instance(cls, log_path: str = None, level: int = logging.INFO) -> object:
         """Gets Logger instance
         If instance does not exists then creates and returns
         """
-        if cls._INSTANCE is None:
-            cls._INSTANCE = cls(path, level)
-        return cls._INSTANCE
+        if cls.__INSTANCE is None:
+            cls.__INSTANCE = cls(cls.__CREATE_KEY, log_path, level)
+        return cls.__INSTANCE
 
 
-    def __init__(self, log_path: str, level: int):
+    def __init__(self, create_key: object, log_path: str, level: int):
+        if create_key != Logger.__CREATE_KEY:
+            raise  LogError("Singleton class, please call Logger.get_instance()")
+
         self.level: int = level
         self.log_path: str = log_path
-        self.file_handler: logging.FileHandler = logging.FileHandler(self.log_path, mode="w")
+
         self.test_logger: logging.Logger = logging.getLogger("robot_logger")
-
-        self._check_path()
-
-        self.file_handler.setFormatter(logging.Formatter(
-            "%(asctime)s %(levelname)s %(filename)s:%(lineno)d %(message)s",
-            datefmt="%Y-%m-%d %H:%M:%S"
-        ))
-
-        self.test_logger.addHandler(self.file_handler)
         self.test_logger.setLevel(level)
 
+        if log_path is not None:
+            self.set_file_log(log_path)
 
 
     def __del__(self):
-        """destructor to cleanup up logging resources"""
+        """destructor to clean up up logging resources"""
         logging.shutdown()
-        if hasattr(self, 'file_handler'):
+        if hasattr(self, 'file_handler') and self.file_handler is not None:
             self.file_handler.close()
+
+
+    def set_level(self, level: str) -> None:
+        """set logging level
+
+        Args:
+            level: logging level description
+        """
+        self.level = getattr(logging, level.upper())
+
+
+    def set_file_log(self, log_path: str) -> None:
+        """set logging file handler
+
+        Args:
+            log_path: location for log file
+        """
+        self.log_path: str = log_path
+        self._check_path()
+        self.file_handler: logging.FileHandler = logging.FileHandler(self.log_path, mode="w")
+        self.file_handler.setFormatter(logging.Formatter(
+            "%(asctime)s %(levelname)s: %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S"
+        ))
+        self.test_logger.addHandler(self.file_handler)
 
 
     @_console_debug
@@ -100,7 +133,6 @@ class Logger:
             message: log message
         """
         self.test_logger.info(message)
-        robot_logger.info("INFO: " + message)
 
 
     @_console_debug
@@ -114,7 +146,6 @@ class Logger:
         if trace:
             message = Logger._format_trace(message)
         self.test_logger.debug(message)
-        robot_logger.debug("DEBUG: " + message)
 
 
     @_console_debug
@@ -125,7 +156,6 @@ class Logger:
             message: log message
         """
         self.test_logger.warning(message)
-        robot_logger.warn("WARN: " + message)
 
 
     def error(self, message: Union[str, Exception]) -> None:
@@ -134,23 +164,24 @@ class Logger:
         Args:
             message: log message
         """
-        # if error is exception then log trace
-        robot_logger.error("ERROR: " + str(message))
-        message = Logger._format_trace(message)
-        self.test_logger.error(message)
+        # if error is exception then log trace for file log
+        self.test_logger.error(Logger._format_trace(str(message)))
 
 
     @staticmethod
     def console(message: str, stream: io.TextIOWrapper =sys.stdout) -> None:
         """Prints to stdout ot stderr"""
         print(message, file=stream)
+        robot_logger.console(message)
 
 
     def _check_path(self) -> None:
         """Check log path is valid directory and is writable"""
-        log_dir = re.sub(r'\w+(?:\.[a-z]+)?$',"",self.log_path) or './'
         if self.log_path is None:
             raise RuntimeError("log path has not been defined; use Logger.set_path()")
+
+        log_dir = re.sub(r'\w+(?:\.[a-z]+)?$',"",self.log_path) or './'
+
         if not os.path.isdir(log_dir):
             raise NotADirectoryError("log directory does not exist")
         if not os.access(log_dir, os.W_OK):
@@ -158,7 +189,7 @@ class Logger:
 
 
     @staticmethod
-    def _format_trace(message) -> str:
+    def _format_trace(message: str) -> str:
         """Formats a message with stack trace
 
         Args:
@@ -169,8 +200,14 @@ class Logger:
         """
         stack = inspect.stack()
         for stack_entry in enumerate(stack):
+            file_stack = stack_entry[1][1]
+            # disregard entries for this file in stack trace
+            if "logger.py" in file_stack:
+                continue
             message = str(message) + \
-                "\n" + f'{"": <19} File: {stack_entry[1][1]}, line {str(stack_entry[1][2])}' \
-                    + f' in {stack_entry[1][3]}' \
-                "\n" + f'{"": <23}' + stack_entry[1][4][0].rstrip("\r\n").lstrip(" ")
+                "\n" + f'{"": <19} File: {file_stack}, line {str(stack_entry[1][2])}' \
+                    + f' in {stack_entry[1][3]}'
+            function_stack = stack_entry[1][4]
+            if function_stack is not None:
+                message += "\n" + f'{"": <23}' + stack_entry[1][4][0].rstrip("\r\n").lstrip(" ")
         return message
