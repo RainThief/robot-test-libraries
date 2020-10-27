@@ -22,7 +22,7 @@ For developing libraries
 The libraries are installable as a package `robot_support` via pip + git
 
 ```shell
-pip install git+https://github.com/defencedigital/robot-support.git
+pip install git+https://github.com/RainThief/robot-test-libraries.git
 ```
 
 ## Running tests
@@ -42,7 +42,7 @@ docker run --rm -it \
 -v <project dir>:/usr/app \
 -v /var/run/docker.sock:/var/run/docker.sock \
 --network=host \
-docker.pkg.github.com/defencedigital/robot-support/ci_support_image:latest \
+docker.pkg.github.com/rainthief/robot-test-libraries/robot_testing:latest \
 robot --loglevel INFO ./<test dir>/*.robot
 ```
 
@@ -51,7 +51,7 @@ robot --loglevel INFO ./<test dir>/*.robot
 In development you can install this library for usage with your new features by installing from your feature branch i.e.
 
 ```shell
- pip install git+https://github.com/defencedigital/robot-support.git@<branch name>
+ pip install git+https://github.com/RainThief/robot-test-libraries.git@<branch name>
 ```
 
 ### Project structure

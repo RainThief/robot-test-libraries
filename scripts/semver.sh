@@ -6,9 +6,6 @@ get_tag() {
     # in fetch mode it gets a commit not a branch
     # git checkout master
 
-    # prune local tags (if exist)
-    git tag -l | xargs git tag -d
-
     # ensure all tags are up to date (for fetch mode)
     # git fetch --tags --all
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-IMAGE_NAME=${CI_IMAGE:-"docker.pkg.github.com/defencedigital/robot-support/ci_support_image"}
+IMAGE_NAME=${CI_IMAGE:-"docker.pkg.github.com/rainthief/robot-test-libraries/ci_support_image"}
 CI=${CI:-"false"}
 PYTHONPATH="$(pwd)"
 export PYTHONPATH

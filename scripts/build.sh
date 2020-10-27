@@ -3,7 +3,7 @@ set -eu
 
 CI=${CI:-"false"}
 
-IMAGE_NAME="docker.pkg.github.com/defencedigital/robot-support/robot_support_image"
+IMAGE_NAME="docker.pkg.github.com/rainthief/robot-test-libraries/robot_testing"
 
 # Assume this script is in the src directory and work from that location
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}" )" && pwd)/../"
@@ -27,7 +27,11 @@ if [ "$CI" == "true" ]; then
         RELEASE_TAG="$(get_tag "patch")"
         docker tag "$IMAGE_NAME" "$IMAGE_NAME:$RELEASE_TAG"
         git tag "v$RELEASE_TAG"
-        git push --tags
+        if [ "$CI" == "true" ]; then
+            git push "https://$GITHUB_TOKEN@$GIT_URL" --tags
+        else
+            git push --tags
+        fi
     fi
     docker push "$IMAGE_NAME"
 fi
