@@ -38,6 +38,7 @@ class Container:
 
     def __init__(self, name: str):
         self._name: str = name
+        self._unique_name: str = ""
         self._stop_task: asyncio.Task = None
         self._process: docker.models.containers.Container = None
         self._logs: Log = None
@@ -64,7 +65,8 @@ class Container:
         if 'log' in kwargs:
             log = kwargs.pop('log')
 
-        kwargs['name'] = self._name
+        self._unique_name = f"{self._name}_{int(time.time())}"
+        kwargs['name'] = self._unique_name
 
         LOGGER.info(f"starting docker container {self._name} from image {image}")
 
@@ -143,9 +145,17 @@ class Container:
         LOGGER.info(f"stopping docker container {self._name}")
         # for better logging we are handling our own sigkill
         # so add 1 to timout so will not be called
-        self._process.stop(timeout=grace_time+1)
+        try:
+            self._process.stop(timeout=grace_time+1)
+        except docker.errors.NotFound:
+            pass
         LOGGER.debug(f"container {self._name} stopped in {int(time.time() - time_start)} seconds", False)
+
         kill_task.cancel()
+
+        # fix for gitlab ci failing to stop containers
+        if self._unique_name in [cont.name for cont in client.containers.list(all=True)]:
+            await self._kill(0)
 
 
     async def _kill(self, grace_time: int) -> None:
@@ -156,5 +166,10 @@ class Container:
         """
         await asyncio.sleep(grace_time)
         self._stop_task.cancel()
-        self._process.kill()
+
+        try:
+            self._process.kill()
+        except docker.errors.NotFound:
+            pass
+
         LOGGER.warn(f"killing docker container {self._name} after failed stop within {grace_time} seconds")
