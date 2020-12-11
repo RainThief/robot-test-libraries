@@ -1,10 +1,10 @@
 FROM python:3.8-alpine3.12 AS builder
 
 RUN apk add --no-cache \
-    curl=7.69.1-r1 \
+    curl=7.69.1-r3 \
     gcc=9.3.0-r2 \
-    postgresql-dev=12.4-r0\
-    musl-dev=1.1.24-r9 \
+    postgresql-dev=12.5-r0\
+    musl-dev=1.1.24-r10 \
     python3-dev=3.8.5-r0
 
 # install hadolint (Dockerfile linter)
@@ -40,8 +40,8 @@ RUN apk add --no-cache \
     bash=5.0.17-r0 \
     git=2.26.2-r0 \
     jq=1.6-r1 \
-    curl=7.69.1-r1 \
-    postgresql=12.4-r0; \
+    curl=7.69.1-r3 \
+    postgresql=12.5-r0; \
     mkdir -p /.cache/pip && chmod 666 -Rc /.cache
 
 COPY --from=builder /usr/local/bin/hadolint /usr/local/bin/hadolint
